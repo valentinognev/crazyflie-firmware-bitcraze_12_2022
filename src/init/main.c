@@ -39,6 +39,8 @@
 
 #include "led.h"
 
+#include "flash_API.h"
+
 /* ST includes */
 #include "stm32fxxx.h"
 
@@ -57,6 +59,16 @@ int main()
 
   //Launch the system task that will initialize and start everything
   systemLaunch();
+
+  //////////////////////////////////////////////////////////////////////////////
+  /// @brief Valentin addition for innner flash write //////////////////////////
+  //  This part shoould be run only once during flash format, and never again
+  
+  if (FLASH_FIRST_WRITE)
+    if (SOFBlock_format(FLASH_SECTOR_INDEX) != true)
+      return false; // Erase flash sector 11 and make structure for storage.
+  //////////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////
 
   //Start the FreeRTOS scheduler
   vTaskStartScheduler();

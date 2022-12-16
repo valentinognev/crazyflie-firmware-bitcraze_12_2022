@@ -22,3 +22,5 @@ obj-y += usbd_desc.o
 obj-y += usblink.o
 obj-y += usb.o
 obj-y += usec_time.o
+obj-y += flash_device.o
+obj-y += flash_API.o

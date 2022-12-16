@@ -56,16 +56,22 @@
 #include "statsCnt.h"
 #include "static_mem.h"
 #include "rateSupervisor.h"
+#include "sitaw.h"
 
 static bool isInit;
 static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
+static bool stab_ready = false;
+//Part of the tests were performed in stabilizer.c in old firmware version 
+// was transfered to health.c in the new firmware versions
 
 static uint32_t inToOutLatency;
 
 // State variables for the stabilizer
 static setpoint_t setpoint;
 static sensorData_t sensorData;
+static bool enable_motors = true;  ///!!! VALENTIN ADD
+                                                              static bool test = true;  ///!!! VALENTIN ADD
 static state_t state;
 static control_t control;
 
@@ -182,6 +188,7 @@ void stabilizerInit(StateEstimatorType estimator)
   powerDistributionInit();
   motorsInit(platformConfigGetMotorMapping());
   collisionAvoidanceInit();
+  sitAwInit();
   estimatorType = stateEstimatorGetType();
   controllerType = controllerGetType();
 
@@ -290,7 +297,7 @@ static void stabilizerTask(void* param)
 
       commanderGetSetpoint(&setpoint, &state);
       compressSetpoint();
-
+      sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
       collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
       controller(&control, &setpoint, &sensorData, &state, tick);

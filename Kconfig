@@ -13,14 +13,14 @@ config CROSS_COMPILE
 
 config DEBUG
     bool "Enable debug build"
-    default n
+    default y
     help
         Enable debug symbols and extra output from firmware.
 
 config DEBUG_QUEUE_MONITOR
     bool "Enable debug queue monitoring"
     depends on DEBUG
-    default n
+    default y
     help
         Enable the queue monitoring functionality.
 

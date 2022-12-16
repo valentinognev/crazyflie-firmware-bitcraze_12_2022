@@ -1,0 +1,16 @@
+obj-y += cf_feat_ext.o
+obj-y += cf_feat_ext_data.o
+obj-y += cf_feat_ext_initialize.o
+obj-y += cf_feat_ext_terminate.o
+obj-y += feat2cmd.o
+obj-y += init.o
+obj-y += mr18_driver.o
+obj-y += mtlb_abs.o
+obj-y += mtlb_median.o
+obj-y += mtlb_power.o
+obj-y += mtlb_sqrt.o
+obj-y += mtlb_sum.o
+obj-y += myRansac.o
+obj-y += repmat.o
+obj-y += state_machine.o
+obj-y += telemetry.o

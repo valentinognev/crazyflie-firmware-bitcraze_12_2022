@@ -52,9 +52,11 @@
 #include "bstdr_types.h"
 #include "static_mem.h"
 #include "estimator.h"
+#include "FreeRTOS.h"
 
 #include "sensors_bmi088_common.h"
 #include "platform_defaults.h"
+#include "flash_API.h"
 
 #define GYRO_ADD_RAW_AND_VARIANCE_LOG_VALUES
 
@@ -88,8 +90,12 @@
 #define GYRO_VARIANCE_THRESHOLD_Y       (GYRO_VARIANCE_BASE)
 #define GYRO_VARIANCE_THRESHOLD_Z       (GYRO_VARIANCE_BASE)
 
-#define SENSORS_ACC_SCALE_SAMPLES  200
+#define GYRO_DEFAULT_X   ( 4.2f)   
+#define GYRO_DEFAULT_Y   (-1.2f) 
+#define GYRO_DEFAULT_Z   ( 1.0f)
+#define FLASH_MAX_WRITES     (1000)
 
+#define SENSORS_ACC_SCALE_SAMPLES  200
 
 typedef struct
 {
@@ -101,6 +107,18 @@ typedef struct
   Axis3i16*  bufHead;
   Axis3i16   buffer[SENSORS_NBR_OF_BIAS_SAMPLES];
 } BiasObj;
+
+
+/// @brief //////////////////////////////////
+typedef struct
+{
+	int16_t statSize;
+	float gyroBiasX;
+	float gyroBiasY;
+	float gyroBiasZ;
+	float accScale;
+} GyroData;
+/////////////////////////////////////////////
 
 /* initialize necessary variables */
 static struct bmi088_dev bmi088Dev;
@@ -173,6 +191,9 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z);
 static bool sensorsFindBiasValue(BiasObj* bias);
 static void sensorsAlignToAirframe(Axis3f* in, Axis3f* out);
 static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
+
+static bool readGyroDataFromFlash(float *biasX, float *biasY, float *biasZ, int16_t *statSize);
+static bool writeGyroDataToFlash(const float biasX, const float biasY, const float biasZ, const bool flashFirstWrite);
 
 STATIC_MEM_TASK_ALLOC(sensorsTask, SENSORS_TASK_STACKSIZE);
 
@@ -288,6 +309,8 @@ static void sensorsTask(void *param)
 {
   systemWaitStart();
 
+  DEBUG_PRINT("******************* BMP088 IMU STARTED ***********************.\n");
+
   Axis3f gyroScaledIMU;
   Axis3f accScaledIMU;
   Axis3f accScaled;
@@ -327,7 +350,7 @@ static void sensorsTask(void *param)
       measurement.type = MeasurementTypeGyroscope;
       measurement.data.gyroscope.gyro = sensorData.gyro;
       estimatorEnqueue(&measurement);
-
+      
       /* Acelerometer */
       accScaledIMU.x = accelRaw.x * SENSORS_BMI088_G_PER_LSB_CFG / accScale;
       accScaledIMU.y = accelRaw.y * SENSORS_BMI088_G_PER_LSB_CFG / accScale;
@@ -668,6 +691,7 @@ static bool processAccScale(int16_t ax, int16_t ay, int16_t az)
     {
       accScale = accScaleSum / SENSORS_ACC_SCALE_SAMPLES;
       accScaleFound = true;
+      DEBUG_PRINT("******************* BMP088 IMU accScale calibrated ***********************\n");
     }
   }
 
@@ -727,6 +751,7 @@ static bool processGyroBiasNoBuffer(int16_t gx, int16_t gy, int16_t gz, Axis3f *
  */
 static bool processGyroBias(int16_t gx, int16_t gy, int16_t gz, Axis3f *gyroBiasOut)
 {
+  static unsigned int lastTick = 0;
   sensorsAddBiasValue(&gyroBiasRunning, gx, gy, gz);
 
   if (!gyroBiasRunning.isBiasValueFound)
@@ -819,6 +844,79 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z)
   }
 }
 
+static bool readGyroDataFromFlash(float *biasX, float *biasY, float *biasZ, int16_t *statSize )
+{
+	SOFBlock reader = { .hblock_ = 0 };
+  if (SOFBlock_open_read(&reader, FLASH_SECTOR_INDEX) != kSOF_ErrNone)
+    return false;
+
+  GyroData* pGyroData   = SOFBlock_get_physical_data_addr(&reader);
+  *statSize = pGyroData->statSize;
+  *biasX = pGyroData->gyroBiasX;
+  *biasY = pGyroData->gyroBiasY;
+  *biasZ = pGyroData->gyroBiasZ;
+  SOFBlock_close_read(&reader);
+
+  return true;
+}
+
+static bool writeGyroDataToFlash(const float biasX, const float biasY, const float biasZ, const bool flashFirstWrite )
+{
+  SOF_Statics_t statics = {.data_addr = 0, .data_size = 0, .free_size = 0};
+
+  float accScale = 0;
+
+  GyroData gyroData = {
+      .statSize = 1,
+      .gyroBiasX = biasX,
+      .gyroBiasY = biasY,
+      .gyroBiasZ = biasZ,
+      .accScale = accScale};
+  if (flashFirstWrite)
+  {
+    //bool result=SOFBlock_format(FLASH_SECTOR_INDEX);
+    //if (!result); // Erase flash sector 11 and make structure for storage.
+    //  return false;
+
+    SOFBlock writer = {.hblock_ = 0};
+    if (SOFBlock_open_write(&writer, FLASH_SECTOR_INDEX) != kSOF_ErrNone)
+      return false;
+    SOFBlock_write_data(&writer, (uint8_t *)&gyroData, sizeof(gyroData));
+    SOFBlock_close_write(&writer);
+
+    readGyroDataFromFlash(&gyroData.gyroBiasX, &gyroData.gyroBiasY, &gyroData.gyroBiasZ, &gyroData.statSize);
+    return true;
+  }
+
+  if (readGyroDataFromFlash(&gyroData.gyroBiasX, &gyroData.gyroBiasY, &gyroData.gyroBiasZ, &gyroData.statSize) != true)
+    return false;
+
+  if (gyroData.statSize < FLASH_MAX_WRITES)
+  {
+    gyroData.gyroBiasX = (gyroData.gyroBiasX * gyroData.statSize + biasX) / (gyroData.statSize + 1);
+    gyroData.gyroBiasY = (gyroData.gyroBiasY * gyroData.statSize + biasY) / (gyroData.statSize + 1);
+    gyroData.gyroBiasZ = (gyroData.gyroBiasZ * gyroData.statSize + biasZ) / (gyroData.statSize + 1);
+    gyroData.accScale = 1;
+    gyroData.statSize += 1;
+
+    SOFBlock writer = {.hblock_ = 0};
+    SOFBlock_open_write(&writer, FLASH_SECTOR_INDEX);
+    uint32_t freeSize = SOFBlock_get_free_size(&writer);
+    if (freeSize < sizeof(gyroData) * 5)
+    {
+      SOFBlock_close_write(&writer);
+      if (SOFBlock_format(FLASH_SECTOR_INDEX) != true)
+        return false;// Erase flash sector 11 and make structure for storage.
+      if (SOFBlock_open_write(&writer, FLASH_SECTOR_INDEX) != kSOF_ErrNone)
+        return false;
+    }
+    SOFBlock_write_data(&writer, (uint8_t *)&gyroData, sizeof(gyroData));
+    SOFBlock_close_write(&writer);
+  }
+
+  return true;
+}
+
 /**
  * Checks if the variances is below the predefined thresholds.
  * The bias value should have been added before calling this.
@@ -826,7 +924,7 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z)
  */
 static bool sensorsFindBiasValue(BiasObj* bias)
 {
-  static int32_t varianceSampleTime;
+  static int32_t varianceSampleTime=0;
   bool foundBias = false;
 
   if (bias->isBufferFilled)
@@ -842,8 +940,25 @@ static bool sensorsFindBiasValue(BiasObj* bias)
       bias->bias.x = bias->mean.x;
       bias->bias.y = bias->mean.y;
       bias->bias.z = bias->mean.z;
-      foundBias = true;
-      bias->isBiasValueFound = true;
+      foundBias = bias->isBiasValueFound = true;
+
+      writeGyroDataToFlash(bias->bias.x, bias->bias.y, bias->bias.z, FLASH_FIRST_WRITE);     
+      DEBUG_PRINT("***** gyro bias var %f %f %f mean %f %f %f  *****\n", bias->variance.x, bias->variance.y, bias->variance.z, bias->mean.x, bias->mean.y, bias->mean.z);
+      vTaskDelay(M2T(10));
+    }
+    else if (varianceSampleTime + 5*GYRO_MIN_BIAS_TIMEOUT_MS < xTaskGetTickCount())
+    {
+       varianceSampleTime = xTaskGetTickCount();
+       int16_t statSize =0;
+       if (readGyroDataFromFlash(&bias->bias.x, &bias->bias.y, &bias->bias.z, &statSize) == false)
+       {
+          bias->bias.x = GYRO_DEFAULT_X;
+          bias->bias.y = GYRO_DEFAULT_Y;
+          bias->bias.z = GYRO_DEFAULT_Z;
+       }
+       foundBias = bias->isBiasValueFound = true;
+//     DEBUG_PRINT("| gyro var %.0f %.0f %.0f mean %.0f %.0f %.0f |\n", bias->variance.x, bias->variance.y, bias->variance.z, bias->mean.x, bias->mean.y, bias->mean.z);
+ //     vTaskDelay(M2T(5));
     }
   }
 
@@ -986,6 +1101,10 @@ void sensorsBmi088Bmp388DataAvailableCallback(void)
 
 #ifdef GYRO_ADD_RAW_AND_VARIANCE_LOG_VALUES
 LOG_GROUP_START(gyro)
+LOG_ADD(LOG_FLOAT, accScale, &accScale)
+LOG_ADD(LOG_FLOAT, gyroBiasX, &gyroBias.x)
+LOG_ADD(LOG_FLOAT, gyroBiasY, &gyroBias.y)
+LOG_ADD(LOG_FLOAT, gyroBiasZ, &gyroBias.z)
 LOG_ADD(LOG_INT16, xRaw, &gyroRaw.x)
 LOG_ADD(LOG_INT16, yRaw, &gyroRaw.y)
 LOG_ADD(LOG_INT16, zRaw, &gyroRaw.z)

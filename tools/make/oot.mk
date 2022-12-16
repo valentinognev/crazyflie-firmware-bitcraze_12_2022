@@ -27,3 +27,7 @@ clean:
 
 cload:
 	$(MAKE) KBUILD_OUTPUT=$(OOT)/build $(OOT_ARGS) cload
+flash:
+	$(MAKE) KBUILD_OUTPUT=$(OOT)/build $(OOT_ARGS) flash
+flash_verify:
+	$(MAKE) KBUILD_OUTPUT=$(OOT)/build $(OOT_ARGS) flash_verify

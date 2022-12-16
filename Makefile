@@ -1,6 +1,6 @@
 
 OPENOCD           ?= openocd
-OPENOCD_INTERFACE ?= interface/stlink-v2.cfg
+OPENOCD_INTERFACE ?= interface/stlink.cfg
 OPENOCD_TARGET    ?= target/stm32f4x.cfg
 OPENOCD_CMDS      ?=
 
@@ -20,7 +20,7 @@ endif
 DFU_UTIL          ?= dfu-util
 
 CLOAD_CMDS        ?=
-CLOAD_ARGS        ?=
+CLOAD_ARGS        = -w radio://0/80/2M/E7E7E7E741
 
 ARCH := stm32f4
 SRCARCH := stm32f4
@@ -113,7 +113,7 @@ PROG ?= $(PLATFORM)
 ifeq ($(CONFIG_DEBUG),y)
 ARCH_CFLAGS	+= -O0 -Wconversion
 else
-ARCH_CFLAGS += -Os -Werror
+ARCH_CFLAGS += -Os# -Werror
 endif
 
 _all:

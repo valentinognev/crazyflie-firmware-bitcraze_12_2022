@@ -216,7 +216,7 @@ bool sensorsMpu9250Lps25hAreCalibrated() {
 static void sensorsTask(void *param)
 {
   measurement_t measurement;
-
+  DEBUG_PRINT("******************* MPU9250 IMU STARTED ***********************.\n");
   systemWaitStart();
 
   sensorsSetupSlaveRead();
@@ -315,11 +315,23 @@ void processAccGyroMeasurements(const uint8_t *buffer)
   Axis3f accScaled;
   // Note the ordering to correct the rotated 90º IMU coordinate system
   accelRaw.y = (((int16_t) buffer[0]) << 8) | buffer[1];
+  #ifdef INVERTED_FLIGHT_MODE
+    accelRaw.y *= -1; //zvuv
+  #endif
   accelRaw.x = (((int16_t) buffer[2]) << 8) | buffer[3];
   accelRaw.z = (((int16_t) buffer[4]) << 8) | buffer[5];
+  #ifdef INVERTED_FLIGHT_MODE
+    accelRaw.z *= -1; //zvuv
+  #endif
   gyroRaw.y = (((int16_t) buffer[8]) << 8) | buffer[9];
+  #ifdef INVERTED_FLIGHT_MODE
+    gyroRaw.y *= -1; //zvuv
+  #endif
   gyroRaw.x = (((int16_t) buffer[10]) << 8) | buffer[11];
   gyroRaw.z = (((int16_t) buffer[12]) << 8) | buffer[13];
+  #ifdef INVERTED_FLIGHT_MODE
+    gyroRaw.z *= -1; //zvuv
+  #endif
 
 
 #ifdef GYRO_BIAS_LIGHT_WEIGHT
@@ -715,7 +727,7 @@ static void sensorsCalculateVarianceAndMean(BiasObj* bias, Axis3f* varOut, Axis3
     sumSq[2] += bias->buffer[i].z * bias->buffer[i].z;
   }
 
-
+  
   meanOut->x = (float) sum[0] / SENSORS_NBR_OF_BIAS_SAMPLES;
   meanOut->y = (float) sum[1] / SENSORS_NBR_OF_BIAS_SAMPLES;
   meanOut->z = (float) sum[2] / SENSORS_NBR_OF_BIAS_SAMPLES;
