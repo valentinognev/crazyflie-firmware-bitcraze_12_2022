@@ -108,8 +108,9 @@ void zRangerTask(void* arg)
     if (range_last < RANGE_OUTLIER_LIMIT) {
       float distance = (float)range_last * 0.001f; // Scale from [mm] to [m]
       float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
-      rangeEnqueueDownRangeInEstimator(distance, stdDev, xTaskGetTickCount());
-    }
+//      rangeEnqueueDownRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+      rangeEnqueueDownRangeInEstimatorNew(distance, stdDev, xTaskGetTickCount(), true);
+   }
   }
 }
 

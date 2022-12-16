@@ -65,6 +65,8 @@
 #include "static_mem.h"
 
 #include "lighthouse_calibration.h"
+#include "log.h"
+#include "param.h"
 // #define DEBUG_STATE_CHECK
 
 // the reversion of pitch and roll to zero
@@ -74,6 +76,9 @@
 #define ROLLPITCH_ZERO_REVERSION (0.001f)
 #endif
 
+static bool Get_HO = false;
+static float var_vx = 0;
+static float var_vy = 0;
 
 /**
  * Supporting and utility functions
@@ -137,14 +142,19 @@ void kalmanCoreDefaultParams(kalmanCoreParams_t* params)
   params->procNoiseVel = 0;
   params->procNoisePos = 0;
   params->procNoiseAtt = 0;
-  params->measNoiseBaro = 2.0f;           // meters
+  params->measNoiseBaro = 0.1;//2.0f;           // meters
   params->measNoiseGyro_rollpitch = 0.1f; // radians per second
   params->measNoiseGyro_yaw = 0.1f;       // radians per second
+  var_vx = 0;
+  var_vy = 0;
 
   params->initialX = 0.0;
   params->initialY = 0.0;
-  params->initialZ = 0.0;
-
+#ifdef INVERTED_FLIGHT_MODE
+  params->initialZ - 0.5; //[[ZVUV]]
+#else
+  params->initialZ = 0.0; //[[ZVUV]]
+#endif
   // Initial yaw of the Crazyflie in radians.
   // 0 --- facing positive X
   // PI / 2 --- facing positive Y
@@ -204,9 +214,11 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params)
   this->Pm.pData = (float*)this->P;
 
   this->baroReferenceHeight = 0.0;
+  this->estMotionVar = 0.0f;
+  this->measMotionVar = 0.0f;
 }
 
-void kalmanCoreScalarUpdate(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm, float error, float stdMeasNoise)
+float kalmanCoreScalarUpdate(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm, float error, float stdMeasNoise)
 {
   // The Kalman gain as a column vector
   NO_DMA_CCM_SAFE_ZERO_INIT static float K[KC_STATE_DIM];
@@ -240,6 +252,7 @@ void kalmanCoreScalarUpdate(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm,
   for (int i=0; i<KC_STATE_DIM; i++) { // Add the element of HPH' to the above
     HPHR += Hm->pData[i]*PHTd[i]; // this obviously only works if the update is scalar (as in this function)
   }
+  float measNoise = HPHR - R;
   ASSERT(!isnan(HPHR));
 
   // ====== MEASUREMENT UPDATE ======
@@ -274,6 +287,7 @@ void kalmanCoreScalarUpdate(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm,
   }
 
   assertStateNotNaN(this);
+  return measNoise;
 }
 
 void kalmanCoreUpdateWithPKE(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm, arm_matrix_instance_f32 *Km, arm_matrix_instance_f32 *P_w_m, float error)
@@ -319,9 +333,12 @@ void kalmanCoreUpdateWithBaro(kalmanCoreData_t *this, const kalmanCoreParams_t *
 
   h[KC_STATE_Z] = 1;
 
-  if (!quadIsFlying || this->baroReferenceHeight < 1) {
-    //TODO: maybe we could track the zero height as a state. Would be especially useful if UWB anchors had barometers.
+  if (Get_HO)
+  {
+    // TODO: maybe we could track the zero height as a state. Would be especially useful if UWB anchors had barometers.
+  //////////////////////////////////////////////////  estimatorKalmanInit2(); // move to estimator_kalman
     this->baroReferenceHeight = baroAsl;
+    // Get_HO=false; //release once delayed plotting logic is complete, currently drops manually
   }
 
   float meas = (baroAsl - this->baroReferenceHeight);
@@ -560,6 +577,9 @@ void kalmanCorePredict(kalmanCoreData_t* this, Axis3f *acc, Axis3f *gyro, float 
   // normalize and store the result
   float norm = arm_sqrt(tmpq0*tmpq0 + tmpq1*tmpq1 + tmpq2*tmpq2 + tmpq3*tmpq3) + EPS;
   this->q[0] = tmpq0/norm; this->q[1] = tmpq1/norm; this->q[2] = tmpq2/norm; this->q[3] = tmpq3/norm;
+  var_vx = this->P[KC_STATE_PX][KC_STATE_PX];
+  var_vy = this->P[KC_STATE_PY][KC_STATE_PY];
+
   assertStateNotNaN(this);
 }
 
@@ -788,3 +808,13 @@ void kalmanCoreDecoupleXY(kalmanCoreData_t* this)
   decoupleState(this, KC_STATE_Y);
   decoupleState(this, KC_STATE_PY);
 }
+
+LOG_GROUP_START(kalman_core)
+  LOG_ADD(LOG_FLOAT, var_vx, &var_vx)
+  LOG_ADD(LOG_FLOAT, var_vy, &var_vy)
+  LOG_ADD(LOG_UINT8, Get_HO, &Get_HO)
+LOG_GROUP_STOP(kalman_core)
+
+PARAM_GROUP_START(kalman_core)
+  PARAM_ADD(PARAM_UINT8, Get_HO, &Get_HO)
+PARAM_GROUP_STOP(kalman_core)

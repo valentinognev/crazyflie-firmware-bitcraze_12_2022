@@ -85,7 +85,7 @@ static void powerDistributionLegacy(const control_t *control, motors_thrust_unca
   motorThrustUncapped->motors.m2 = control->thrust - r - p - control->yaw;
   motorThrustUncapped->motors.m3 = control->thrust + r - p + control->yaw;
   motorThrustUncapped->motors.m4 = control->thrust + r + p - control->yaw;
-}
+  }
 
 static void powerDistributionForceTorque(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped) {
   static float motorForces[STABILIZER_NR_OF_MOTORS];
@@ -110,11 +110,11 @@ static void powerDistributionForceTorque(const control_t *control, motors_thrust
     float motor_pwm = (-pwmToThrustB + sqrtf(pwmToThrustB * pwmToThrustB + 4.0f * pwmToThrustA * motorForce)) / (2.0f * pwmToThrustA);
     motorThrustUncapped->list[motorIndex] = motor_pwm * UINT16_MAX;
   }
-}
+  }
 
 static void powerDistributionForce(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped) {
   // Not implemented yet
-}
+  }
 
 void powerDistribution(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped)
 {

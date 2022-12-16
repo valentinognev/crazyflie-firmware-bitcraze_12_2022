@@ -49,6 +49,11 @@
 #include "static_mem.h"
 
 #define PROPTEST_NBR_OF_VARIANCE_VALUES   100
+#define PROPTEST_DELAY_OFFSET 300
+
+static uint16_t testPower = 5000; // speed at which to test motors
+// testvariance for 1S should be at least 80.0 for 2S at least 160.0
+static float testVariance = 2.5f;
 
 static bool startPropTest = false;
 static bool startBatTest = false;
@@ -181,11 +186,11 @@ void healthRunTests(sensorData_t *sensors)
     healthTestSettings = motorsGetHealthTestSettings(motorToTest);
 
     sampleIndex = ((int32_t) i) - healthTestSettings->varianceMeasurementStartMsec;
-    if (sampleIndex >= 0 && sampleIndex < PROPTEST_NBR_OF_VARIANCE_VALUES)
+    if (sampleIndex >= PROPTEST_DELAY_OFFSET && sampleIndex < PROPTEST_NBR_OF_VARIANCE_VALUES + PROPTEST_DELAY_OFFSET)
     {
-      accX[sampleIndex] = sensors->acc.x;
-      accY[sampleIndex] = sensors->acc.y;
-      accZ[sampleIndex] = sensors->acc.z;
+      accX[sampleIndex - PROPTEST_DELAY_OFFSET] = sensors->acc.x;
+      accY[sampleIndex - PROPTEST_DELAY_OFFSET] = sensors->acc.y;
+      accZ[sampleIndex - PROPTEST_DELAY_OFFSET] = sensors->acc.z;
       if (pmGetBatteryVoltage() < minSingleLoadedVoltage[motorToTest])
       {
         minSingleLoadedVoltage[motorToTest] = pmGetBatteryVoltage();
@@ -193,7 +198,7 @@ void healthRunTests(sensorData_t *sensors)
     }
     i++;
 
-    if (sampleIndex == PROPTEST_NBR_OF_VARIANCE_VALUES)
+    if (sampleIndex == PROPTEST_NBR_OF_VARIANCE_VALUES + PROPTEST_DELAY_OFFSET)
     {
       accVarX[motorToTest] = variance(accX, PROPTEST_NBR_OF_VARIANCE_VALUES);
       accVarY[motorToTest] = variance(accY, PROPTEST_NBR_OF_VARIANCE_VALUES);
@@ -207,13 +212,16 @@ void healthRunTests(sensorData_t *sensors)
 
     if (i == 1 && healthTestSettings->onPeriodMsec > 0)
     {
-      motorsSetRatio(motorToTest, propTestPWMRatio > 0 ? propTestPWMRatio : healthTestSettings->onPeriodPWMRatio);
+      //motorsSetRatio(motorToTest, propTestPWMRatio > 0 ? propTestPWMRatio : healthTestSettings->onPeriodPWMRatio);
+      motorsSetRatio(motorToTest, testPower);
     }
-    else if (i == healthTestSettings->onPeriodMsec)
+    else if ((i == healthTestSettings->onPeriodMsec)
+           ||(i == 500))
     {
       motorsSetRatio(motorToTest, 0);
     }
-    else if (i >= healthTestSettings->onPeriodMsec + healthTestSettings->offPeriodMsec)
+    else if ((i >= healthTestSettings->onPeriodMsec + healthTestSettings->offPeriodMsec)
+           ||(i >= 1500))
     {
       i = 0;
       motorToTest++;
@@ -286,7 +294,7 @@ void healthRunTests(sensorData_t *sensors)
   {
     for (int m = 0; m < NBR_OF_MOTORS; m++)
     {
-      if (!evaluatePropTest(0, PROPELLER_BALANCE_TEST_THRESHOLD,  accVarX[m] + accVarY[m], m))
+      if (!evaluatePropTest(0.1, testVariance, accVarX[m] + accVarY[m], m))
       {
         nrFailedTests++;
         for (int j = 0; j < 3; j++)
@@ -336,6 +344,9 @@ PARAM_ADD_CORE(PARAM_UINT8, startBatTest, &startBatTest)
  */
 PARAM_ADD_CORE(PARAM_UINT16 | PARAM_PERSISTENT, propTestPWMRatio, &propTestPWMRatio)
 
+PARAM_ADD(PARAM_FLOAT, testVariance, &testVariance)
+PARAM_ADD(PARAM_UINT16, testPower, &testPower)
+PARAM_ADD(PARAM_UINT8, motorPass, &motorPass)
 PARAM_GROUP_STOP(health)
 
 /**

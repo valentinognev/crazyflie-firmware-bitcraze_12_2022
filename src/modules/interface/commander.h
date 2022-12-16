@@ -40,8 +40,8 @@
 // some day there is a priority lower than the high-level commander.
 #define COMMANDER_PRIORITY_LOWEST    1
 #define COMMANDER_PRIORITY_HIGHLEVEL 1
-#define COMMANDER_PRIORITY_CRTP      2
-#define COMMANDER_PRIORITY_EXTRX     3
+#define COMMANDER_PRIORITY_CRTP      3 //ZVUV: Active_Autonomous=4 / CRTP=3 (stronger) / Bolt_SM=2 / Nano_SM = 1
+#define COMMANDER_PRIORITY_EXTRX     2
 
 void commanderInit(void);
 bool commanderTest(void);

@@ -84,83 +84,151 @@ static float velZFiltCutoff = PID_VEL_Z_FILT_CUTOFF;
 #endif
 
 #ifndef UNIT_TEST
+#ifndef TWO_S_DRONE
 static struct this_s this = {
-  .pidVX = {
-    .pid = {
+    .pidVX = {
+        .pid = {
       .kp = PID_VEL_X_KP,
       .ki = PID_VEL_X_KI,
       .kd = PID_VEL_X_KD,
       .kff = PID_VEL_X_KFF,
+        },
+        .pid.dt = DT,
     },
-    .pid.dt = DT,
-  },
 
-  .pidVY = {
-    .pid = {
+    .pidVY = {
+        .pid = {
       .kp = PID_VEL_Y_KP,
       .ki = PID_VEL_Y_KI,
       .kd = PID_VEL_Y_KD,
       .kff = PID_VEL_Y_KFF,
+        },
+        .pid.dt = DT,
     },
-    .pid.dt = DT,
-  },
   #if CONFIG_CONTROLLER_PID_IMPROVED_BARO_Z_HOLD
     .pidVZ = {
-      .pid = {
+        .pid = {
         .kp = PID_VEL_Z_KP_BARO_Z_HOLD,
         .ki = PID_VEL_Z_KI_BARO_Z_HOLD,
         .kd = PID_VEL_Z_KD_BARO_Z_HOLD,
         .kff = PID_VEL_Z_KFF_BARO_Z_HOLD,
-      },
-      .pid.dt = DT,
+        },
+        .pid.dt = DT,
     },
-  #else
+#else
     .pidVZ = {
-      .pid = {
+        .pid = {
         .kp = PID_VEL_Z_KP,
         .ki = PID_VEL_Z_KI,
         .kd = PID_VEL_Z_KD,
         .kff = PID_VEL_Z_KFF,
-      },
-      .pid.dt = DT,
+        },
+        .pid.dt = DT,
     },
-  #endif
-  .pidX = {
-    .pid = {
+#endif
+    .pidX = {
+        .pid = {
       .kp = PID_POS_X_KP,
       .ki = PID_POS_X_KI,
       .kd = PID_POS_X_KD,
       .kff = PID_POS_X_KFF,
+        },
+        .pid.dt = DT,
     },
-    .pid.dt = DT,
-  },
 
-  .pidY = {
-    .pid = {
+    .pidY = {
+        .pid = {
       .kp = PID_POS_Y_KP,
       .ki = PID_POS_Y_KI,
       .kd = PID_POS_Y_KD,
       .kff = PID_POS_Y_KFF,
+        },
+        .pid.dt = DT,
     },
-    .pid.dt = DT,
-  },
 
-  .pidZ = {
-    .pid = {
+    .pidZ = {
+        .pid = {
       .kp = PID_POS_Z_KP,
       .ki = PID_POS_Z_KI,
       .kd = PID_POS_Z_KD,
       .kff = PID_POS_Z_KFF,
+        },
+        .pid.dt = DT,
     },
-    .pid.dt = DT,
-  },
   #if CONFIG_CONTROLLER_PID_IMPROVED_BARO_Z_HOLD
     .thrustBase = PID_VEL_THRUST_BASE_BARO_Z_HOLD,
-  #else
+#else
     .thrustBase = PID_VEL_THRUST_BASE,
-  #endif
+#endif
   .thrustMin  = PID_VEL_THRUST_MIN,
 };
+
+#else
+static struct this_s this = {
+    .pidVX = {
+        .init = {
+            .kp = 14.375f,
+            .ki = 0.575f,
+            .kd = 0.0f,
+            .kff = PID_POS_Z_KFF,
+        },
+        .pid.dt = DT,
+    },
+
+    .pidVY = {
+        .init = {
+            .kp = 14.375f,
+            .ki = 0.575f,
+            .kd = 0.0f,
+            .kff = PID_POS_Z_KFF,
+        },
+        .pid.dt = DT,
+    },
+
+    .pidVZ = {
+        .init = {
+            .kp = 7.1875,
+            .ki = 8.625,
+            .kd = 0,
+            .kff = PID_POS_Z_KFF,
+       },
+        .pid.dt = DT,
+    },
+
+    .pidX = {
+        .init = {
+            .kp = 2.0f,
+            .ki = 0,
+            .kd = 0,
+            .kff = PID_POS_Z_KFF,
+       },
+        .pid.dt = DT,
+    },
+
+    .pidY = {
+        .init = {
+            .kp = 2.0f,
+            .ki = 0,
+            .kd = 0,
+            .kff = PID_POS_Z_KFF,
+        },
+        .pid.dt = DT,
+    },
+
+    .pidZ = {
+        .init = {
+            .kp = 1.0f,
+            .ki = 0.2875,
+            .kd = 0,
+            .kff = PID_POS_Z_KFF,
+        },
+        .pid.dt = DT,
+    },
+
+    .thrustBase = 28000,
+    .thrustMin = 2000,
+};
+#endif
 #endif
 
 void positionControllerInit()
@@ -283,6 +351,12 @@ void positionControllerResetAllfilters() {
   filterReset(&this.pidVX.pid, POSITION_RATE, velFiltCutoff, velFiltEnable);
   filterReset(&this.pidVY.pid, POSITION_RATE, velFiltCutoff, velFiltEnable);
   filterReset(&this.pidVZ.pid, POSITION_RATE, velZFiltCutoff, velZFiltEnable);
+}
+
+void positionControllerResetVxVyPID()
+{
+  pidReset(&this.pidVX.pid);
+  pidReset(&this.pidVY.pid);
 }
 
 /**

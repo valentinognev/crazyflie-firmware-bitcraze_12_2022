@@ -54,7 +54,13 @@
 #define SYS_LED          LED_RED_R
 #define ERR_LED1         LED_RED_L
 #define ERR_LED2         LED_RED_R
+#define GEN_BLU_L        LED_BLUE_L  // General use for the left back blue led
+#define GEN_GRE_R        LED_GREEN_R // General use for the right front green led }
+#define GEN_RED_R        LED_RED_R   // General use for the right front red led   } will require seq_def define
+#define GEN_GRE_L        LED_GREEN_L // General use for the left front green led  }
+#define GEN_RED_L        LED_RED_L   // General use for the right back blue led   }
 
+//#define LED_NUM 5
 #define LED_NUM 6
 
 typedef enum {LED_BLUE_L = 0, LED_GREEN_L, LED_RED_L, LED_GREEN_R, LED_RED_R, LED_BLUE_NRF} led_t;

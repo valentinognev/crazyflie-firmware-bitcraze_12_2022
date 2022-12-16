@@ -56,10 +56,15 @@ static float expCoeff;
 static uint16_t range_last = 0;
 
 static bool isInit;
+static int8_t statusReadMr18;
+static uint8_t rangeStatus;
+static const uint8_t status_rtn[24] = {25, 25, 25, 5, 2, 4, 1, 7, 3, 0,
+                                       25, 25, 9, 13, 25, 25, 25, 25, 10, 6,
+                                       25, 25, 11, 12};
 
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t dev;
 
-static uint16_t zRanger2GetMeasurementAndRestart(VL53L1_Dev_t *dev)
+static uint16_t zRanger2GetMeasurementAndRestart(VL53L1_Dev_t *dev, bool *valid)
 {
     VL53L1_Error status = VL53L1_ERROR_NONE;
     VL53L1_RangingMeasurementData_t rangingData;
@@ -71,6 +76,18 @@ static uint16_t zRanger2GetMeasurementAndRestart(VL53L1_Dev_t *dev)
         status = VL53L1_GetMeasurementDataReady(dev, &dataReady);
         vTaskDelay(M2T(1));
     }
+    // Read range status:
+    uint8_t RgSt;
+    statusReadMr18 = (int8_t)VL53L1_RdByte(dev, VL53L1_RESULT__RANGE_STATUS, &RgSt);
+    RgSt = RgSt & 0x1F;
+
+    rangeStatus = 25;
+    status = VL53L1_RdByte(dev, VL53L1_RESULT__RANGE_STATUS, &RgSt);
+    RgSt = RgSt & 0x1F;
+    if (RgSt < 24)
+      rangeStatus = status_rtn[RgSt];
+
+    *valid = (rangeStatus == 0U) ? true : false;
 
     status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
     range = rangingData.RangeMilliMeter;
@@ -122,6 +139,7 @@ void zRanger2Task(void* arg)
   // Restart sensor
   VL53L1_StopMeasurement(&dev);
   VL53L1_SetDistanceMode(&dev, VL53L1_DISTANCEMODE_MEDIUM);
+  // VL53L1_SetDistanceMode(&dev, VL53L1_DISTANCEMODE_LONG);
   VL53L1_SetMeasurementTimingBudgetMicroSeconds(&dev, 25000);
 
   VL53L1_StartMeasurement(&dev);
@@ -130,17 +148,24 @@ void zRanger2Task(void* arg)
 
   while (1) {
     vTaskDelayUntil(&lastWakeTime, M2T(25));
+    bool valid = false;
 
-    range_last = zRanger2GetMeasurementAndRestart(&dev);
+    range_last = zRanger2GetMeasurementAndRestart(&dev, &valid);
     rangeSet(rangeDown, range_last / 1000.0f);
 
     // check if range is feasible and push into the estimator
     // the sensor should not be able to measure >5 [m], and outliers typically
     // occur as >8 [m] measurements
-    if (range_last < RANGE_OUTLIER_LIMIT) {
+    if (range_last < RANGE_OUTLIER_LIMIT) 
+    {
       float distance = (float)range_last * 0.001f; // Scale from [mm] to [m]
       float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
-      rangeEnqueueDownRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+  //    rangeEnqueueDownRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+      rangeEnqueueDownRangeInEstimatorNew(distance, stdDev, xTaskGetTickCount(), valid);
+    }
+    else
+    {
+      rangeEnqueueDownRangeInEstimatorNew(-1.0f, 100.f, xTaskGetTickCount(), valid);
     }
   }
 }
@@ -166,3 +191,20 @@ PARAM_GROUP_START(deck)
 PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcZRanger2, &isInit)
 
 PARAM_GROUP_STOP(deck)
+
+LOG_GROUP_START(zrngInf2)
+LOG_ADD(LOG_UINT8, rngStat, &rangeStatus)
+LOG_GROUP_STOP(zrngInf2)
+
+/*
+    rangeStatus = VL53L1_RANGESTATUS_RANGE_VALID;  // 0
+    rangeStatus = VL53L1_RANGESTATUS_SIGMA_FAIL;  // 1
+    rangeStatus = VL53L1_RANGESTATUS_SIGNAL_FAIL;  // 2
+    rangeStatus = VL53L1_RANGESTATUS_RANGE_VALID_MIN_RANGE_CLIPPED;  // 3
+    rangeStatus = VL53L1_RANGESTATUS_OUTOFBOUNDS_FAIL;  // 4
+    rangeStatus = VL53L1_RANGESTATUS_RANGE_VALID_NO_WRAP_CHECK_FAIL;  // 6
+    rangeStatus = VL53L1_RANGESTATUS_WRAP_TARGET_FAIL;  // 7
+    rangeStatus = VL53L1_RANGESTATUS_XTALK_SIGNAL_FAIL;  // 9
+    rangeStatus = VL53L1_RANGESTATUS_SYNCRONISATION_INT;  // 10
+    rangeStatus = VL53L1_RANGESTATUS_NONE;  // 255
+*/

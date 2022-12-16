@@ -40,7 +40,7 @@ bool attitudeControllerTest(void);
  * attitude controller can be run in a slower update rate then the rate
  * controller.
  */
-void attitudeControllerCorrectAttitudePID(
+int attitudeControllerCorrectAttitudePID(
        float eulerRollActual, float eulerPitchActual, float eulerYawActual,
        float eulerRollDesired, float eulerPitchDesired, float eulerYawDesired,
        float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired);
@@ -72,11 +72,6 @@ void attitudeControllerResetAllPID(void);
  * Get the actuator output.
  */
 void attitudeControllerGetActuatorOutput(int16_t* roll, int16_t* pitch, int16_t* yaw);
-
-/**
- * Get yaw max delta
- */
-float attitudeControllerGetYawMaxDelta(void);
 
 
 #endif /* ATTITUDE_CONTROLLER_H_ */

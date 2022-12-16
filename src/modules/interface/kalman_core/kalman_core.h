@@ -89,7 +89,13 @@ typedef struct {
   __attribute__((aligned(4))) float P[KC_STATE_DIM][KC_STATE_DIM];
   arm_matrix_instance_f32 Pm;
 
+  // Indicates that the internal state is corrupt and should be reset
+  bool resetEstimation;
+
   float baroReferenceHeight;
+
+  float estMotionVar;
+  float measMotionVar;
 
   // Quaternion used for initial orientation [w,x,y,z]
   float initialQuaternion[4];
@@ -153,6 +159,6 @@ void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, co
 
 void kalmanCoreDecoupleXY(kalmanCoreData_t* this);
 
-void kalmanCoreScalarUpdate(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm, float error, float stdMeasNoise);
+float kalmanCoreScalarUpdate(kalmanCoreData_t *this, arm_matrix_instance_f32 *Hm, float error, float stdMeasNoise);
 
 void kalmanCoreUpdateWithPKE(kalmanCoreData_t* this, arm_matrix_instance_f32 *Hm, arm_matrix_instance_f32 *Km, arm_matrix_instance_f32 *P_w_m, float error);

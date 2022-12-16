@@ -36,10 +36,15 @@
 
 static bool isInit;
 
-static void buzzDeckOn(uint32_t freq)
+//static void buzzDeckOn(uint32_t freq)
+//{
+//  piezoSetRatio(128);
+//  piezoSetFreq(freq);
+//}
+static void buzzDeckOn(uint8_t ratio)
 {
-  piezoSetRatio(128);
-  piezoSetFreq(freq);
+  piezoSetRatio(ratio); //ZVUV
+  piezoSetFreq(16745); //ZVUV
 }
 
 static void buzzDeckOff()

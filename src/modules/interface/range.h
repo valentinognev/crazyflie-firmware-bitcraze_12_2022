@@ -59,5 +59,7 @@ float rangeGet(rangeDirection_t direction);
  * @param distance Distance to the ground (m)
  * @param stdDev The standard deviation of the range sample
  * @param timeStamp The time when the range was sampled (in sys ticks)
+ * @return true if the sample was successfuly enqueued
  */
-void rangeEnqueueDownRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+//void rangeEnqueueDownRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+void rangeEnqueueDownRangeInEstimatorNew(float distance, float stdDev, uint32_t timeStamp, bool valid);

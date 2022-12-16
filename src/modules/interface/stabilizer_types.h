@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2011-2022 Bitcraze AB
+ * Copyright (C) 2011-2012 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -179,10 +179,10 @@ typedef struct control_s {
   union {
     // controlModeLegacy
     struct {
-      int16_t roll;
-      int16_t pitch;
-      int16_t yaw;
-      float thrust;
+  int16_t roll;
+  int16_t pitch;
+  int16_t yaw;
+  float thrust;
     };
 
     // controlModeForceTorque
@@ -220,10 +220,10 @@ typedef union {
 typedef union {
   uint16_t list[STABILIZER_NR_OF_MOTORS];
   struct {
-    uint16_t m1;  // PWM ratio
-    uint16_t m2;  // PWM ratio
-    uint16_t m3;  // PWM ratio
-    uint16_t m4;  // PWM ratio
+  uint16_t m1;  // PWM ratio
+  uint16_t m2;  // PWM ratio
+  uint16_t m3;  // PWM ratio
+  uint16_t m4;  // PWM ratio
   } motors;
 } motors_thrust_pwm_t;
 
@@ -282,6 +282,7 @@ typedef struct flowMeasurement_s {
   float stdDevX;      // Measurement standard deviation
   float stdDevY;      // Measurement standard deviation
   float dt;           // Time during which pixels were accumulated
+  bool update;
 } flowMeasurement_t;
 
 

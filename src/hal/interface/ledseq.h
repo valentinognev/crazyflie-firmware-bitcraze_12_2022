@@ -52,6 +52,10 @@
 #define LEDSEQ_STOP      -1
 #define LEDSEQ_LOOP      -2
 
+#define dtMAX        1000.0f
+#define dtMIN        50.0f
+
+
 typedef struct {
   bool value;
   int action;
@@ -128,6 +132,25 @@ void ledseqStopBlocking(ledseqContext_t* context);
  */
 void ledseqSetChargeLevel(const float chargeLevel);
 
+/**
+ * @brief Update frequency in the Left Blue led to reflect a value
+ *        Possible to change affected led through:
+ *        LedSeqSelect = seq_gen_blue -> Blue back led, LedSeqSelect = seq_gen_gre -> Green front led
+ *        MAX and MIN frequencies are controlled through #define in ledseq.h
+ *
+ * @param dt The period of the led, Duty Cycle fixed 50%, frequency = 1/dt
+ */
+void LedSeqUpdate(const float dt);
+
+/**
+ * @brief Set Duty Cycle
+ *         Used to artificially shut down the led blue light without stopping sequence
+ *          Hence - applying on time 0 and off time 1000ms to led
+ *
+ * @param DC Duty Cycle
+ */
+void LedDutyCycle(int DC);
+
 // System led sequences
 extern ledseqContext_t seq_calibrated;
 extern ledseqContext_t seq_alive;
@@ -138,5 +161,6 @@ extern ledseqContext_t seq_charged;
 extern ledseqContext_t seq_charging;
 extern ledseqContext_t seq_testPassed;
 extern ledseqContext_t seq_testFailed;
+extern ledseqContext_t seq_gen_blu;
 
 #endif

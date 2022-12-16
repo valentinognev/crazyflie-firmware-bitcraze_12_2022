@@ -76,10 +76,42 @@ static bool useAdaptiveStd = false;
 
 // Set standard deviation flow
 // (will not work if useAdaptiveStd is on)
-static float flowStdFixed = 2.0f;
+static float flowStdFixed = 2.0f; // Aron: 0.25 is rerquired for good pivot performance (150321)
 
 #define NCS_PIN DECK_GPIO_IO3
 
+static uint16_t num_consec_OL = 0; // number of consecutive outliers
+static uint16_t max_num_consec_OL = 50;
+static uint16_t OF_valid_TH = 4; // number of inliers (out of 16) for determining "safe ground" (hesteresis)
+static uint8_t reached_maximum_OL = 0;
+static uint8_t OF_valid = 0;
+static float dt_max = 0.035f;
+static uint8_t min_squal = 90;
+
+static uint16_t array_inliers = 0;
+static uint16_t num_inliers = 0;
+
+void enq_IL()
+{ // enqueue inlier
+  if ((array_inliers & 0x8000) == 0)
+  { // if MSB is 0 (OL) then add 1 to inliers
+    num_inliers++;
+  }
+
+  array_inliers = (array_inliers << 1) | 0x1;
+  return;
+}
+
+void enq_OL()
+{ // enqueue outlier
+  if ((array_inliers & 0x8000) > 0)
+  {
+    num_inliers--;
+  }
+
+  array_inliers = (array_inliers << 1);
+  return;
+}
 
 static void flowdeckTask(void *param)
 {
@@ -150,13 +182,53 @@ static void flowdeckTask(void *param)
 #endif
       // Push measurements into the estimator if flow is not disabled
       //    and the PMW flow sensor indicates motion detection
-      if (!useFlowDisabled && currentMotion.motion == 0xB0) {
-        flowData.dt = (float)(usecTimestamp()-lastTime)/1000000.0f;
+      if (!useFlowDisabled)
+      { //&& (currentMotion.motion == 0xB0)
+        flowData.dt = (float)(usecTimestamp() - lastTime) / 1000000.0f;
         lastTime = usecTimestamp();
+        if (flowData.dt < dt_max && (currentMotion.squal >= min_squal))
+        {
+          num_consec_OL = 0;
+          enq_IL();
+          flowData.update = true;
+        }
+        else
+        {
+          flowData.update = false;
+          num_consec_OL++;
+          enq_OL();
+        }
         estimatorEnqueueFlow(&flowData);
       }
-    } else {
+      else
+      {
+        num_consec_OL++;
+        enq_OL();
+      }
+    }
+    else
+    {
       outlierCount++;
+      num_consec_OL++;
+      enq_OL();
+    }
+
+    if (num_consec_OL >= max_num_consec_OL)
+    {
+      num_consec_OL = max_num_consec_OL;
+      reached_maximum_OL = 1;
+    }
+    else
+    {
+      reached_maximum_OL = 0;
+    }
+    if (num_inliers >= OF_valid_TH)
+    {
+      OF_valid = 1;
+    }
+    else
+    {
+      OF_valid = 0;
     }
   }
 }
@@ -298,6 +370,12 @@ LOG_ADD(LOG_UINT8, squal, &currentMotion.squal)
  * @brief Standard deviation of flow measurement
  */
 LOG_ADD(LOG_FLOAT, std, &stdFlow)
+LOG_ADD(LOG_UINT8, max_OL, &reached_maximum_OL)
+LOG_ADD(LOG_UINT16, cOL_cnt, &num_consec_OL)
+LOG_ADD(LOG_UINT16, mx_cOL, &max_num_consec_OL)
+LOG_ADD(LOG_UINT8, OF_valid, &OF_valid)
+LOG_ADD(LOG_UINT16, OF_valid_TH, &OF_valid_TH)
+LOG_ADD(LOG_UINT16, numIL_16, &num_inliers)
 LOG_GROUP_STOP(motion)
 
 /**
@@ -317,6 +395,10 @@ PARAM_ADD(PARAM_UINT8, adaptive, &useAdaptiveStd)
  * @brief Set standard devivation flow measurement (default: 2.0f)
  */
 PARAM_ADD_CORE(PARAM_FLOAT, flowStdFixed, &flowStdFixed)
+PARAM_ADD(PARAM_UINT16, max_cOL, &max_num_consec_OL)
+PARAM_ADD(PARAM_UINT16, OF_valid_TH, &OF_valid_TH)
+PARAM_ADD(PARAM_FLOAT, dt_max, &dt_max)
+PARAM_ADD(PARAM_UINT8, min_squal, &min_squal)
 PARAM_GROUP_STOP(motion)
 
 PARAM_GROUP_START(deck)

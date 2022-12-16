@@ -37,6 +37,7 @@
 
 #include "autoconf.h"
 #include "led.h"
+#include <debug.h>
 
 #ifdef CONFIG_DEBUG_ENABLE_LED_MORSE
   #define DOT 100
@@ -142,6 +143,18 @@ ledseqContext_t seq_charging = {
   .led = CHG_LED,
 };
 
+ledseqStep_t seq_gen_blu_def[] = {
+    {true, LEDSEQ_WAITMS(500)},
+    {false, LEDSEQ_WAITMS(500)},
+    {0, LEDSEQ_LOOP},
+};
+
+ledseqContext_t seq_gen_blu = {
+    // Blue led gen use
+    .sequence = seq_gen_blu_def,
+    .led = GEN_BLU_L,
+};
+
 ledseqStep_t seq_testPassed_def[] = {
   { true, LEDSEQ_WAITMS(50)},
   {false, LEDSEQ_WAITMS(50)},
@@ -203,8 +216,9 @@ void ledseqInit() {
   ledseqRegisterSequence(&seq_testPassed);
   ledseqRegisterSequence(&seq_testFailed);
   ledseqRegisterSequence(&seq_lowbat);
-  ledseqRegisterSequence(&seq_charged);
-  ledseqRegisterSequence(&seq_charging);
+  //ledseqRegisterSequence(&seq_charged); //Removed not to interrupt ledtask
+  //ledseqRegisterSequence(&seq_charging); //Removed not to interrupt ledtask
+  ledseqRegisterSequence(&seq_gen_blu); 
   ledseqRegisterSequence(&seq_calibrated);
   ledseqRegisterSequence(&seq_alive);
   ledseqRegisterSequence(&seq_linkUp);
@@ -292,6 +306,95 @@ void ledseqSetChargeLevel(const float chargeLevel) {
 
   seq_charging.sequence[0].action = onTime;
   seq_charging.sequence[1].action = offTime;
+}
+
+void LedDutyCycle(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_gen_blu.sequence[0].action = onTime;
+  seq_gen_blu.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedDutyCycle_LB(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_lowbat.sequence[0].action = onTime;
+  seq_lowbat.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedDutyCycle_CALIB(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_calibrated.sequence[0].action = onTime;
+  seq_calibrated.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedDutyCycle_ALV(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_alive.sequence[0].action = onTime;
+  seq_alive.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedDutyCycle_LINKU(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_linkUp.sequence[0].action = onTime;
+  seq_linkUp.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedDutyCycle_LINKD(int DC)
+{ // 0<=DC=<1
+  int onTime = 1000 * DC;
+  int offTime = 1000 - onTime;
+
+  seq_linkDown.sequence[0].action = onTime;
+  seq_linkDown.sequence[1].action = offTime;
+  /* In order to control a different led or sequence,
+   will require to create a different function or a
+   switchcase cpndition to change seq_gen_color*/
+}
+
+void LedSeqUpdate(const float dt)
+{ // Recieves dt (period time in ms) operates on blue led
+  int GenOnTime = dt;
+  if (dt > dtMAX)
+  {                    // dtMax & dtMIN resemble boundry frequencies, predefined in ledseq.h
+    GenOnTime = dtMAX; // Default: fmin,fmax=(1,50)Hz
+  }
+  if (dt < dtMIN)
+  {
+    GenOnTime = dtMIN;
+  }
+  int GenOffTime = GenOnTime;
+
+  seq_gen_blu.sequence[0].action = GenOnTime;
+  seq_gen_blu.sequence[1].action = GenOffTime;
 }
 
 bool ledseqStop(ledseqContext_t *context) {

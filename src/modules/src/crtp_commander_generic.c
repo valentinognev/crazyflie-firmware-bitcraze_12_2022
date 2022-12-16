@@ -36,6 +36,11 @@
 #include "quatcompress.h"
 #include "FreeRTOS.h"
 
+// ZVUV
+#include "log.h"
+static uint8_t ext_hover_act = 0; // for future use
+// ZVUV
+
 /* The generic commander format contains a packet type and data that has to be
  * decoded into a setpoint_t structure. The aim is to make it future-proof
  * by easily allowing the addition of new packets for future use cases.
@@ -307,6 +312,9 @@ struct hoverPacket_s {
 } __attribute__((packed));
 static void hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
+  // ZVUV
+  ext_hover_act = 1; // ZVUV: for future use, need to null when no packet arrives (timeout?)
+  // ZVUV
   const struct hoverPacket_s *values = data;
 
   ASSERT(datalen == sizeof(struct hoverPacket_s));
@@ -430,14 +438,34 @@ void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   }
 }
 
+// Params for generic CRTP handlers
+LOG_GROUP_START(cmdr_log)
+LOG_ADD(LOG_UINT8, ext_hover_act, &ext_hover_act)
+LOG_GROUP_STOP(cmdr_log)
+
 /**
  * The CPPM (Combined Pulse Position Modulation) parameters
  * configure the maximum angle/rate output given a maximum stick input
  * for CRTP packets with emulated CPPM channels (e.g. RC transmitters connecting
  * directly to the NRF radio, often with a 4-in-1 Multimodule), or for CPPM channels
  * from an external receiver.  
+
+ * The CPPM (Combined Pulse Position Modulation) commander packet contains
+ * an emulation of CPPM channels transmitted in a CRTP packet that can be sent
+ * from e.g. a RC Transmitter. Often running custom firmware such as Deviation.
+ *
+ * Channels have a range of 1000-2000 with a midpoint of 1500
+ * Supports the ordinary RPYT channels plus up to MAX_AUX_RC_CHANNELS auxiliary channels.
+ * Auxiliary channels are optional and transmitters do not have to transmit all the data
+ * unless a given channel is actually in use (numAuxChannels must be set accordingly)
+ *
+ * Current aux channel assignments:
+ *  AuxChannel0: set high to enable self-leveling, low to disable
+ *
+ * The scaling can be configured using the parameters, setting the maximum
+ * angle/rate output given a maximum stick input (1000 or 2000).
  */
-PARAM_GROUP_START(cppm)
+PARAM_GROUP_START(cmdrCPPM)
 
 /**
  * @brief Config of max roll rate at max stick input [DPS] (default: 720)
@@ -460,4 +488,4 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, angRoll, &s_CppmEmuRollMaxAngleDeg)
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, rateYaw, &s_CppmEmuYawMaxRateDps)
 
-PARAM_GROUP_STOP(cppm)
+PARAM_GROUP_STOP(cmdrCPPM)

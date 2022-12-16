@@ -23,6 +23,7 @@ static float r_roll;
 static float r_pitch;
 static float r_yaw;
 static float accelz;
+static uint8_t rstInt = 0;
 
 void controllerPidInit(void)
 {
@@ -64,7 +65,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     // Rate-controled YAW is moving YAW angle setpoint
     if (setpoint->mode.yaw == modeVelocity) {
       attitudeDesired.yaw = capAngle(attitudeDesired.yaw + setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT);
-
+       
       float yawMaxDelta = attitudeControllerGetYawMaxDelta();
       if (yawMaxDelta != 0.0f)
       {
@@ -104,9 +105,16 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
       attitudeDesired.pitch = setpoint->attitude.pitch;
     }
 
-    attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
-                                attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
-                                &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
+    if (attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
+                                             attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
+                                             &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw))
+    {
+      positionControllerResetVxVyPID();
+      rstInt += 1;
+    }
+    // attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
+    //                             attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
+    //                             &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
 
     // For roll and pitch, if velocity mode, overwrite rateDesired with the setpoint
     // value. Also reset the PID to avoid error buildup, which can lead to unstable
@@ -228,3 +236,4 @@ LOG_ADD(LOG_FLOAT, pitchRate, &rateDesired.pitch)
  */
 LOG_ADD(LOG_FLOAT, yawRate,   &rateDesired.yaw)
 LOG_GROUP_STOP(controller)
+

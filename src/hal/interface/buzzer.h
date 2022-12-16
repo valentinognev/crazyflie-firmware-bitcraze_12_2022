@@ -29,11 +29,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// /** Functionpointers used to control the buzzer */
+// struct buzzerControl
+// {
+//   void (*off)();
+//   void (*on)(uint32_t freq);
+// };
 /** Functionpointers used to control the buzzer */
 struct buzzerControl
 {
   void (*off)();
-  void (*on)(uint32_t freq);
+  void (*on)(uint8_t freq);
 };
 
 /**

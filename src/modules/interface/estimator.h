@@ -79,7 +79,7 @@ void stateEstimatorInit(StateEstimatorType estimator);
 bool stateEstimatorTest(void);
 void stateEstimatorSwitchTo(StateEstimatorType estimator);
 void stateEstimator(state_t *state, const uint32_t tick);
-StateEstimatorType stateEstimatorGetType(void);
+StateEstimatorType getStateEstimator(void);
 const char* stateEstimatorGetName();
 
 // Support to incorporate additional sensors into the state estimate via the following functions
@@ -118,7 +118,7 @@ static inline void estimatorEnqueueDistance(const distanceMeasurement_t *distanc
   estimatorEnqueue(&m);
 }
 
-static inline void estimatorEnqueueTOF(const tofMeasurement_t *tof)
+static inline bool estimatorEnqueueTOF(const tofMeasurement_t *tof)
 {
   measurement_t m;
   m.type = MeasurementTypeTOF;

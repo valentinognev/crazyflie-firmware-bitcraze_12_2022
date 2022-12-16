@@ -173,7 +173,7 @@ typedef const struct {
 
 static uint32_t neffect = 0;
 static uint32_t sys_effect = 0;
-static uint32_t user_effect = 0;
+static uint32_t user_effect = 12;
 
 static Melody range_slow = {.bpm = 120, .delay = 1, .notes = {{C4, H}, {D4, H}, {E4, H}, {F4, H}, {G4, H}, {A4, H}, {B4, H}, REPEAT}};
 static Melody range_fast = {.bpm = 120, .delay = 1, .notes = {{C4, S}, {D4, S}, {E4, S}, {F4, S}, {G4, S}, {A4, S}, {B4, S}, REPEAT}};
@@ -245,10 +245,12 @@ static void melodyplayer(uint32_t counter, uint32_t * mi, Melody * m) {
   }
 }
 
+static uint8_t static_ratio = 255; // ZVUV initialize at 255 (Nominal = 205 @ 35 cm) to avoid burning the led
 static uint16_t static_freq = 4000;
 static void bypass(uint32_t counter, uint32_t * mi, Melody * melody)
 {
-  buzzerOn(static_freq);
+  buzzerOn(static_ratio);
+//  buzzerOn(static_freq);
 }
 
 static uint16_t siren_start = 2000;
@@ -325,11 +327,15 @@ static void soundTimer(xTimerHandle timer)
   int effect;
   counter++;
 
-  if (sys_effect != 0) {
-    effect = sys_effect;
-  } else {
-    effect = user_effect;
-  }
+//************ ZVUV LED modifications
+
+  // if (sys_effect != 0) {
+    // effect = sys_effect;  //don't allow system effects to prevent turning on led at high power
+  // } else {
+    effect = user_effect; 
+  // }  
+
+//************ ZVUV LED modifications
 
   if (effect > neffect) {
     DEBUG_PRINT("Bad value for effect (> neffect)\n");
@@ -405,5 +411,5 @@ PARAM_ADD_CORE(PARAM_UINT32 | PARAM_RONLY, neffect, &neffect)
  * @brief Frequency to use for Bypass effect
  */
 PARAM_ADD_CORE(PARAM_UINT16, freq, &static_freq)
-
+PARAM_ADD(PARAM_UINT8, ratio, &static_ratio)
 PARAM_GROUP_STOP(sound)

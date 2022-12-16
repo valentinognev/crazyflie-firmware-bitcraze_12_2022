@@ -50,6 +50,7 @@ typedef struct {
   bool (*test)(void);
   void (*update)(state_t *state, const uint32_t tick);
   const char* name;
+  void (*init2)(void);
 } EstimatorFcns;
 
 #define NOT_IMPLEMENTED ((void*)0)
@@ -61,6 +62,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .test = NOT_IMPLEMENTED,
         .update = NOT_IMPLEMENTED,
         .name = "None",
+        .init2 = NOT_IMPLEMENTED,
     }, // Any estimator
     {
         .init = estimatorComplementaryInit,
@@ -68,6 +70,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .test = estimatorComplementaryTest,
         .update = estimatorComplementary,
         .name = "Complementary",
+        .init2 = NOT_IMPLEMENTED,
     },
 #ifdef CONFIG_ESTIMATOR_KALMAN_ENABLE
     {
@@ -76,6 +79,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .test = estimatorKalmanTest,
         .update = estimatorKalman,
         .name = "Kalman",
+        .init2 = estimatorKalmanInit2,
     },
 #endif
 #ifdef CONFIG_ESTIMATOR_OOT
@@ -132,8 +136,13 @@ StateEstimatorType stateEstimatorGetType(void) {
 }
 
 static void initEstimator(const StateEstimatorType estimator) {
-  if (estimatorFunctions[estimator].init) {
+  if (estimatorFunctions[estimator].init) 
+  {
     estimatorFunctions[estimator].init();
+  }
+  if (estimatorFunctions[estimator].init2)
+  {
+    estimatorFunctions[estimator].init2();
   }
 }
 

@@ -57,10 +57,9 @@ typedef struct _PmSyslinkInfo
     uint8_t flags;
     struct
     {
-      uint8_t isCharging   : 1;
-      uint8_t usbPluggedIn : 1;
-      uint8_t canCharge    : 1;
-      uint8_t unused       : 5;
+      uint8_t chg    : 1;
+      uint8_t pgood  : 1;
+      uint8_t unused : 6;
     };
   };
   float vBat;
@@ -102,8 +101,6 @@ static PMStates pmState;
 static PmSyslinkInfo pmSyslinkInfo;
 
 static uint8_t batteryLevel;
-
-static bool ignoreChargedState = false;
 
 static void pmSetBatteryVoltage(float voltage);
 
@@ -256,29 +253,11 @@ static void pmGracefulShutdown()
   syslinkSendPacket(&slp);
 }
 
-static void pmEnableBatteryStatusAutoupdate()
-{
-  SyslinkPacket slp = {
-    .type = SYSLINK_PM_BATTERY_AUTOUPDATE,
-  };
-
-  syslinkSendPacket(&slp);
-}
-
 void pmSyslinkUpdate(SyslinkPacket *slp)
 {
   if (slp->type == SYSLINK_PM_BATTERY_STATE) {
-    // First byte of the packet contains some PM flags such as USB power, charging etc.
     memcpy(&pmSyslinkInfo, &slp->data[0], sizeof(pmSyslinkInfo));
-
-    // If using voltage measurements from external battery, we'll set the
-    // voltage to this instead of the one sent from syslink.
-    if (isExtBatVoltDeckPinSet) {
-      pmSetBatteryVoltage(extBatteryVoltage);
-    } else {
-      pmSetBatteryVoltage(pmSyslinkInfo.vBat);
-    }
-
+    pmSetBatteryVoltage(pmSyslinkInfo.vBat);
 #ifdef PM_SYSTLINK_INLCUDE_TEMP
     temp = pmSyslinkInfo.temp;
 #endif
@@ -294,37 +273,31 @@ void pmSetChargeState(PMChargeStates chgState)
 
 PMStates pmUpdateState()
 {
-  bool usbPluggedIn = pmSyslinkInfo.usbPluggedIn;
-  bool isCharging = pmSyslinkInfo.isCharging;
-  PMStates nextState;
+  PMStates state;
+  bool isCharging = pmSyslinkInfo.chg;
+  bool isPgood = pmSyslinkInfo.pgood;
+  uint32_t batteryLowTime;
 
-  uint32_t batteryLowTime = xTaskGetTickCount() - batteryLowTimeStamp;
+  batteryLowTime = xTaskGetTickCount() - batteryLowTimeStamp;
 
-  if (ignoreChargedState)
+  if (isPgood && !isCharging)
   {
-    // For some scenarios we might not care about the charging/charged state.
-    nextState = battery;
+    state = charged;
   }
-  else if (usbPluggedIn && !isCharging)
+  else if (isPgood && isCharging)
   {
-    nextState = charged;
+    state = charging;
   }
-  else if (usbPluggedIn && isCharging)
+  else if (!isPgood && !isCharging && (batteryLowTime > PM_BAT_LOW_TIMEOUT))
   {
-    nextState = charging;
+    state = lowPower;
   }
   else
   {
-    nextState = battery;
+    state = battery;
   }
 
-  if (nextState == battery && batteryLowTime > PM_BAT_LOW_TIMEOUT)
-  {
-    // This is to avoid setting state to lowPower when we're plugged in to USB.
-    nextState = lowPower;
-  }
-
-  return nextState;
+  return state;
 }
 
 void pmEnableExtBatteryCurrMeasuring(const deckPin_t pin, float ampPerVolt)
@@ -373,10 +346,6 @@ float pmMeasureExtBatteryVoltage(void)
   return voltage;
 }
 
-void pmIgnoreChargedState(bool ignore) {
-  ignoreChargedState = ignore;
-}
-
 bool pmIsBatteryLow(void) {
   return (pmState == lowPower);
 }
@@ -408,10 +377,6 @@ void pmTask(void *param)
   pmSetChargeState(charge500mA);
   systemWaitStart();
 
-  // Continuous battery voltage and status messages must be enabled
-  // after system startup to avoid syslink queue overflow.
-  pmEnableBatteryStatusAutoupdate();
-
   while(1)
   {
     vTaskDelay(100);
@@ -439,23 +404,23 @@ void pmTask(void *param)
       switch (pmState)
       {
         case charged:
-          ledseqStop(&seq_charging);
-          ledseqRunBlocking(&seq_charged);
+        /*ledseqStop(&seq_charging);
+          ledseqRunBlocking(&seq_charged);*/ //Removed not to interrupt ledtask
           soundSetEffect(SND_BAT_FULL);
           break;
         case charging:
-          ledseqStop(&seq_lowbat);
+        /*ledseqStop(&seq_lowbat);
           ledseqStop(&seq_charged);
-          ledseqRunBlocking(&seq_charging);
-          soundSetEffect(SND_USB_CONN);
+          ledseqRunBlocking(&seq_charging);*/ //Removed not to interrupt ledtask
+           soundSetEffect(SND_USB_CONN);
           break;
         case lowPower:
           ledseqRunBlocking(&seq_lowbat);
           soundSetEffect(SND_BAT_LOW);
           break;
         case battery:
-          ledseqRunBlocking(&seq_charging);
-          ledseqRun(&seq_charged);
+        /*ledseqRunBlocking(&seq_charging);
+          ledseqRun(&seq_charged);*/         //Removed not to interrupt ledtask
           soundSetEffect(SND_USB_DISC);
           break;
         default:
@@ -470,10 +435,10 @@ void pmTask(void *param)
         break;
       case charging:
         {
-          // Charge level between 0.0 and 1.0
+          /*// Charge level between 0.0 and 1.0
           float chargeLevel = pmBatteryChargeFromVoltage(pmGetBatteryVoltage()) / 10.0f;
-          ledseqSetChargeLevel(chargeLevel);
-        }
+          ledseqSetChargeLevel(chargeLevel);*/  //Removed not to interrupt ledtask
+         }
         break;
       case lowPower:
         {
